@@ -33,7 +33,7 @@ struct AppleMusicDiscordPresenceApp: App {
                 ) {
 
                     Text(
-                        "位置情報診断"
+                        "Location Diagnostics"
                     )
                     .font(
                         .headline
@@ -41,17 +41,17 @@ struct AppleMusicDiscordPresenceApp: App {
 
 
                     Text(
-                        "権限: \(locationProbe.statusText)"
+                        "Permission: \(locationProbe.statusText)"
                     )
 
 
                     Text(
-                        "UsageDescription: \(locationProbe.hasUsageDescription ? "あり" : "なし")"
+                        "UsageDescription: \(locationProbe.hasUsageDescription ? "Available" : "Missing")"
                     )
 
 
                     Text(
-                        "Background location: \(locationProbe.hasBackgroundLocation ? "あり" : "なし")"
+                        "Background location: \(locationProbe.hasBackgroundLocation ? "Available" : "Missing")"
                     )
 
 
@@ -63,7 +63,7 @@ struct AppleMusicDiscordPresenceApp: App {
                     } label: {
 
                         Text(
-                            "位置情報許可を要求"
+                            "Request Location Permission"
                         )
                         .frame(
                             maxWidth:
@@ -83,7 +83,7 @@ struct AppleMusicDiscordPresenceApp: App {
                     } label: {
 
                         Text(
-                            "状態を再確認"
+                            "Refresh Status"
                         )
                         .frame(
                             maxWidth:
@@ -134,7 +134,7 @@ final class LocationPermissionProbe:
 
     @Published
     var statusText =
-        "確認中"
+        "Checking"
 
 
     @Published
@@ -180,31 +180,31 @@ final class LocationPermissionProbe:
         case .notDetermined:
 
             statusText =
-                "notDetermined / 未選択"
+                "notDetermined / Not Requested"
 
 
         case .authorizedWhenInUse:
 
             statusText =
-                "authorizedWhenInUse / 使用中のみ許可"
+                "authorizedWhenInUse / While Using App"
 
 
         case .authorizedAlways:
 
             statusText =
-                "authorizedAlways / 常に許可"
+                "authorizedAlways / Always Allowed"
 
 
         case .denied:
 
             statusText =
-                "denied / 拒否"
+                "denied / Denied"
 
 
         case .restricted:
 
             statusText =
-                "restricted / 制限あり"
+                "restricted / 制限Available"
 
 
         @unknown default:
@@ -321,7 +321,7 @@ final class LocationPermissionProbe:
         case .authorizedWhenInUse:
 
             statusText =
-                "使用中の位置情報は既に許可済み"
+                "Location access already allowed while using the app"
 
 
             /*
@@ -336,7 +336,7 @@ final class LocationPermissionProbe:
         case .authorizedAlways:
 
             statusText =
-                "常に許可済み"
+                "Always Allowed済み"
 
 
             BackgroundLocationKeeper
@@ -347,19 +347,19 @@ final class LocationPermissionProbe:
         case .denied:
 
             statusText =
-                "拒否されています。設定から変更が必要"
+                "Deniedされています。設定から変更が必要"
 
 
         case .restricted:
 
             statusText =
-                "iOSの制限により位置情報を使用できません"
+                "Location access is restricted by iOS"
 
 
         @unknown default:
 
             statusText =
-                "不明な権限状態"
+                "Unknown permission status"
         }
     }
 
