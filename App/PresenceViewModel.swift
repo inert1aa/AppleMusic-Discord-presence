@@ -17,6 +17,12 @@ final class PresenceViewModel: ObservableObject {
     @Published var embeddedArtwork: UIImage?
     @Published var artworkUploadStatus = "Waiting for artwork"
     @Published var artworkPublicURL: String?
+    @Published var testDiscordAsset = false
+
+    func toggleDiscordArtworkTest() {
+        testDiscordAsset.toggle()
+        forceRefresh()
+    }
 
     @Published var artist =
         "Not Available"
@@ -1562,7 +1568,8 @@ final class PresenceViewModel: ObservableObject {
 
         // Only the artwork URL verified for this exact track is safe.
         // Never fall back to a previous song or a shared album cache.
-        let artworkURL = resolved.artworkURL
+        // Diagnostic: compare Discord-hosted app asset with external cover URL.
+        let artworkURL = testDiscordAsset ? "applemusic" : resolved.artworkURL
 
         // MARK: Playback time
 
