@@ -146,10 +146,24 @@ final class PresenceViewModel: ObservableObject {
     private var artworkUploadsInProgress = Set<String>()
 
     private func cachedEmbeddedCoverURL(for item: MPMediaItem) -> String? {
+        // This runs for every playing track, not only recognized albums.
+        // Preserve the exact JPEG encoding used by the known-working covers.
         guard let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
-              let data = image.jpegData(compressionQuality: 0.9) else { return nil }
+              let data = image.jpegData(compressionQuality: 0.9) else {
+            artworkPublicURL = nil
+            artworkUploadStatus = "No embedded cover for this song"
+            return nil
+        }
         let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        return uploadedCoverByHash[hash]
+        if let url = uploadedCoverByHash[hash] {
+            artworkPublicURL = url
+            artworkUploadStatus = "Cached embedded cover ready; Discord display not yet verified"
+            return url
+        }
+        // Don't leave the previous song's artwork link on screen.
+        artworkPublicURL = nil
+        artworkUploadStatus = "New song cover; preparing automatic upload"
+        return nil
     }
 
     private func scheduleEmbeddedCoverUpload(for item: MPMediaItem, identity: String) {
