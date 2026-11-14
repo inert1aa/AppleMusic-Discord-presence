@@ -2,21 +2,9 @@
 set -euo pipefail
 
 ZIP="VendorUpload/discord_partner_sdk.zip"
-HEADER="VendorUpload/discordpp.h"
-C_HEADER="VendorUpload/cdiscord.h"
 
 if [[ ! -f "$ZIP" ]]; then
   echo "::error::discord_partner_sdk.zip not found"
-  exit 1
-fi
-
-if [[ ! -f "$HEADER" ]]; then
-  echo "::error::discordpp.h not found"
-  exit 1
-fi
-
-if [[ ! -f "$C_HEADER" ]]; then
-  echo "::error::cdiscord.h not found"
   exit 1
 fi
 
@@ -50,8 +38,12 @@ DEST="Vendor/Frameworks/discord_partner_sdk.framework"
 
 cp -R "$FRAMEWORK" "$DEST"
 
-cp "$HEADER" Vendor/include/discordpp.h
-cp "$C_HEADER" Vendor/include/cdiscord.h
+if [[ ! -f "$DEST/Headers/discordpp.h" || ! -f "$DEST/Headers/cdiscord.h" ]]; then
+  echo "::error::SDK framework headers missing"
+  exit 1
+fi
+cp "$DEST/Headers/discordpp.h" Vendor/include/discordpp.h
+cp "$DEST/Headers/cdiscord.h" Vendor/include/cdiscord.h
 
 echo "=== Framework contents ==="
 find "$DEST" -maxdepth 4 -print
