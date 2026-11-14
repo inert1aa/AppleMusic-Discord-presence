@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var model: PresenceViewModel
+    @ObservedObject var locationProbe: LocationPermissionProbe
+    @State private var showLocationDiagnostics = false
 
     var body: some View {
         NavigationStack {
@@ -40,15 +42,18 @@ struct ContentView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                             VStack(alignment: .leading, spacing: 5) {
-                            Text(model.trackTitle)
-                                .font(.title3)
-                                .fontWeight(.semibold)
+                                Text(model.trackTitle)
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.85)
 
-                            if !model.artist.isEmpty {
-                                Text(model.artist)
-                                    .foregroundStyle(.secondary)
+                                if !model.artist.isEmpty {
+                                    Text(model.artist)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
                             }
-                        }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
@@ -64,7 +69,7 @@ struct ContentView: View {
                         Text("Discord")
                             .font(.headline)
 
-                        HStack {
+                        HStack(alignment: .top, spacing: 12) {
                             Text("Connection Status")
                                 .foregroundStyle(.secondary)
 
@@ -80,6 +85,8 @@ struct ContentView: View {
                                     .frame(width: 8, height: 8)
 
                                 Text(model.discordStatus)
+                                    .multilineTextAlignment(.trailing)
+                                    .lineLimit(3)
                             }
                         }
 
@@ -134,9 +141,49 @@ struct ContentView: View {
                             .fill(.regularMaterial)
                     )
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: 700)
+                .frame(maxWidth: .infinity)
             }
             .navigationTitle("Music Presence")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        locationProbe.refresh()
+                        showLocationDiagnostics = true
+                    } label: {
+                        Image(systemName: "location.circle")
+                    }
+                    .accessibilityLabel("Location Diagnostics")
+                }
+            }
+            .sheet(isPresented: $showLocationDiagnostics) {
+                NavigationStack {
+                    Form {
+                        Section("Location Permission") {
+                            LabeledContent("Permission", value: locationProbe.statusText)
+                            LabeledContent("Usage Description", value: locationProbe.hasUsageDescription ? "Available" : "Missing")
+                            LabeledContent("Background Location", value: locationProbe.hasBackgroundLocation ? "Available" : "Missing")
+                        }
+                        Section {
+                            Button("Request Location Permission") {
+                                locationProbe.requestPermission()
+                            }
+                            Button("Refresh Status") {
+                                locationProbe.refresh()
+                            }
+                        }
+                    }
+                    .navigationTitle("Location Diagnostics")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { showLocationDiagnostics = false }
+                        }
+                    }
+                }
+            }
         }
     }
 }
