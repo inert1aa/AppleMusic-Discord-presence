@@ -91,6 +91,16 @@ struct ContentView: View {
                             }
                         }
 
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Cover Artwork")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Text(model.artworkUploadStatus)
+                                .font(.footnote)
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
                         Button {
                             model.connectDiscord()
                         } label: {
