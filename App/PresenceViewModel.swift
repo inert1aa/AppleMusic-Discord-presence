@@ -926,13 +926,13 @@ final class PresenceViewModel: ObservableObject {
         case .playing:
 
             musicStatus =
-                "再生中"
+                "Playing"
 
 
         case .paused:
 
             musicStatus =
-                "一時Stopped"
+                "Paused"
 
 
         case .stopped:
@@ -944,25 +944,25 @@ final class PresenceViewModel: ObservableObject {
         case .interrupted:
 
             musicStatus =
-                "中断"
+                "Interrupted"
 
 
         case .seekingForward:
 
             musicStatus =
-                "早送り"
+                "Fast Forwarding"
 
 
         case .seekingBackward:
 
             musicStatus =
-                "巻き戻し"
+                "Rewinding"
 
 
         @unknown default:
 
             musicStatus =
-                "その他"
+                "Other"
         }
     }
 
@@ -1014,7 +1014,7 @@ final class PresenceViewModel: ObservableObject {
 
 
             trackTitle =
-                "再生中の曲なし"
+                "Nothing Playing"
 
 
             artist =
@@ -2085,7 +2085,7 @@ final class PresenceViewModel: ObservableObject {
         } catch {
 
             print(
-                "[iTunes] Lookup失敗:",
+                "[iTunes] Lookup failed:",
                 error
             )
 
@@ -2397,7 +2397,7 @@ final class PresenceViewModel: ObservableObject {
         } catch {
 
             print(
-                "[iTunes] Search失敗:",
+                "[iTunes] Search failed:",
                 error
             )
 
