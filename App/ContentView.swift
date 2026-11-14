@@ -25,7 +25,21 @@ struct ContentView: View {
 
                         Divider()
 
-                        VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 12) {
+                            if let artwork = model.embeddedArtwork {
+                                Image(uiImage: artwork)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 84, height: 84)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .accessibilityLabel("Embedded album artwork")
+                            } else {
+                                Image(systemName: "music.note")
+                                    .frame(width: 84, height: 84)
+                                    .background(.quaternary)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            VStack(alignment: .leading, spacing: 5) {
                             Text(model.trackTitle)
                                 .font(.title3)
                                 .fontWeight(.semibold)
@@ -35,7 +49,8 @@ struct ContentView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                     .padding()
                     .background(
