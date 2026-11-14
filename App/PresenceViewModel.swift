@@ -1441,52 +1441,9 @@ final class PresenceViewModel: ObservableObject {
         }
 
 
-        // MARK: Artwork
-
-        var artworkURL =
-            resolved.artworkURL
-
-
-        if artworkURL == nil {
-
-            artworkURL =
-                artworkByTrack[
-                    currentIdentity
-                ]
-        }
-
-
-        if artworkURL == nil,
-           !albumKey.isEmpty {
-
-            artworkURL =
-                artworkByAlbum[
-                    albumKey
-                ]
-        }
-
-
-        if artworkURL == nil,
-           !albumKey.isEmpty,
-           lastArtworkAlbumKey ==
-                albumKey {
-
-            artworkURL =
-                lastArtworkURL
-        }
-
-
-        if let artworkURL {
-
-            saveArtwork(
-                artworkURL,
-                identity:
-                    currentIdentity,
-                albumKey:
-                    albumKey
-            )
-        }
-
+        // Only the artwork URL verified for this exact track is safe.
+        // Never fall back to a previous song or a shared album cache.
+        let artworkURL = resolved.artworkURL
 
         // MARK: Playback time
 
@@ -1646,226 +1603,57 @@ final class PresenceViewModel: ObservableObject {
         -> ResolvedStoreInformation {
 
 
-        // MARK: Already cached
+        // Artwork must belong to this exact song and album.
+        // In particular, never reuse an album cache or fuzzy iTunes search
+        // result for a different local-file version or custom cover.
+        let fallback = fallbackSongURL(item: item)
 
-        if let cached =
-            storeResultByTrack[
-                identity
-            ] {
-
-            let artwork =
-                largeArtworkURL(
-                    from:
-                        cached
-                            .artworkUrl100
-                )
-                ??
-                cachedAlbumArtwork(
-                    albumKey:
-                        albumKey
-                )
-
-
-            if let artwork {
-
-                saveArtwork(
-                    artwork,
-                    identity:
-                        identity,
-                    albumKey:
-                        albumKey
-                )
-            }
-
-
-            return
-                ResolvedStoreInformation(
-                    songURL:
-                        cached
-                            .trackViewUrl,
-                    artworkURL:
-                        artwork
-                )
-        }
-
-
-        // MARK: Track artwork cache
-
-        if let cachedArtwork =
-            artworkByTrack[
-                identity
-            ] {
-
-            return
-                ResolvedStoreInformation(
-                    songURL:
-                        fallbackSongURL(
-                            item:
-                                item
-                        ),
-                    artworkURL:
-                        cachedArtwork
-                )
-        }
-
-
-        // MARK: Store ID lookup
-
-        let storeID =
-            item.playbackStoreID
-
-
-        if !storeID.isEmpty {
-
-            if let result =
-                await
-                lookupStoreTrack(
-                    storeID:
-                        storeID
-                ) {
-
-                storeResultByTrack[
-                    identity
-                ] =
-                    result
-
-
-                let artwork =
-                    largeArtworkURL(
-                        from:
-                            result
-                                .artworkUrl100
-                    )
-                    ??
-                    cachedAlbumArtwork(
-                        albumKey:
-                            albumKey
-                    )
-
-
-                if let artwork {
-
-                    saveArtwork(
-                        artwork,
-                        identity:
-                            identity,
-                        albumKey:
-                            albumKey
-                    )
-                }
-
-
-                return
-                    ResolvedStoreInformation(
-                        songURL:
-                            result
-                                .trackViewUrl
-                            ??
-                            fallbackSongURL(
-                                item:
-                                    item
-                            ),
-                        artworkURL:
-                            artwork
-                    )
-            }
-        }
-
-
-        // MARK: Album cache
-
-        if let albumArtwork =
-            cachedAlbumArtwork(
-                albumKey:
-                    albumKey
-            ) {
-
-            return
-                ResolvedStoreInformation(
-                    songURL:
-                        fallbackSongURL(
-                            item:
-                                item
-                        ),
-                    artworkURL:
-                        albumArtwork
-                )
-        }
-
-
-        // MARK: Search fallback
-
-        if let result =
-            await
-            searchStoreTrack(
-                title:
-                    title,
-                artist:
-                    artist,
-                album:
-                    album
-            ) {
-
-            storeResultByTrack[
-                identity
-            ] =
-                result
-
-
-            let artwork =
-                largeArtworkURL(
-                    from:
-                        result
-                            .artworkUrl100
-                )
-
-
-            if let artwork {
-
-                saveArtwork(
-                    artwork,
-                    identity:
-                        identity,
-                    albumKey:
-                        albumKey
-                )
-            }
-
-
-            return
-                ResolvedStoreInformation(
-                    songURL:
-                        result
-                            .trackViewUrl
-                        ??
-                        fallbackSongURL(
-                            item:
-                                item
-                        ),
-                    artworkURL:
-                        artwork
-                        ??
-                        cachedAlbumArtwork(
-                            albumKey:
-                                albumKey
-                        )
-                )
-        }
-
-
-        return
-            ResolvedStoreInformation(
-                songURL:
-                    fallbackSongURL(
-                        item:
-                            item
-                    ),
-                artworkURL:
-                    cachedAlbumArtwork(
-                        albumKey:
-                            albumKey
-                    )
+        if let cached = storeResultByTrack[identity],
+           isExactArtworkMatch(cached, title: title, artist: artist, album: album) {
+            return ResolvedStoreInformation(
+                songURL: cached.trackViewUrl ?? fallback,
+                artworkURL: largeArtworkURL(from: cached.artworkUrl100)
             )
+        }
+
+        // Store IDs are reliable only if the returned metadata also matches.
+        let storeID = item.playbackStoreID
+        if !storeID.isEmpty,
+           let result = await lookupStoreTrack(storeID: storeID),
+           isExactArtworkMatch(result, title: title, artist: artist, album: album) {
+            storeResultByTrack[identity] = result
+            return ResolvedStoreInformation(
+                songURL: result.trackViewUrl ?? fallback,
+                artworkURL: largeArtworkURL(from: result.artworkUrl100)
+            )
+        }
+
+        // Search is a last resort, and is accepted only for an exact
+        // title + artist + album match. Never substitute a different cover.
+        if let result = await searchStoreTrack(title: title, artist: artist, album: album),
+           isExactArtworkMatch(result, title: title, artist: artist, album: album) {
+            storeResultByTrack[identity] = result
+            return ResolvedStoreInformation(
+                songURL: result.trackViewUrl ?? fallback,
+                artworkURL: largeArtworkURL(from: result.artworkUrl100)
+            )
+        }
+
+        return ResolvedStoreInformation(songURL: fallback, artworkURL: nil)
+    }
+
+    private func isExactArtworkMatch(
+        _ result: StoreTrack,
+        title: String,
+        artist: String,
+        album: String
+    ) -> Bool {
+        guard !title.isEmpty, !artist.isEmpty, !album.isEmpty else {
+            return false
+        }
+        return normalize(result.trackName ?? "") == normalize(title)
+            && normalize(result.artistName ?? "") == normalize(artist)
+            && normalize(result.collectionName ?? "") == normalize(album)
     }
 
 
