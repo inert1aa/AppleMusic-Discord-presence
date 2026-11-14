@@ -204,7 +204,7 @@ final class LocationPermissionProbe:
         case .restricted:
 
             statusText =
-                "restricted / 制限Available"
+                "restricted / Restricted"
 
 
         @unknown default:
@@ -336,7 +336,7 @@ final class LocationPermissionProbe:
         case .authorizedAlways:
 
             statusText =
-                "Always Allowed済み"
+                "Always Allowed"
 
 
             BackgroundLocationKeeper
@@ -347,7 +347,7 @@ final class LocationPermissionProbe:
         case .denied:
 
             statusText =
-                "Deniedされています。設定から変更が必要"
+                "Location access denied. Change this in iOS Settings."
 
 
         case .restricted:
