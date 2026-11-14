@@ -2769,6 +2769,50 @@ final class PresenceViewModel: ObservableObject {
                 )
         }
     }
+    private func uploadPixelHostCover(data: Data, digest: String) async -> String? {
+        if let cached = pixelHostCoverByHash[digest] { return cached }
+        guard let endpoint = URL(string: "https://www.pixelhost.fun/api/upload") else { return nil }
+        let boundary = "MusicPresence-\(UUID().uuidString)"
+        var body = Data()
+        func append(_ value: String) { body.append(Data(value.utf8)) }
+        append("--\(boundary)\r\n")
+        append("Content-Disposition: form-data; name=\"files\"; filename=\"cover.jpg\"\r\n")
+        append("Content-Type: image/jpeg\r\n\r\n")
+        body.append(data)
+        append("\r\n--\(boundary)--\r\n")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 25
+        do {
+            let (responseData, response) = try await URLSession.shared.upload(for: request, from: body)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                  let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any],
+                  let returned = (json["direct"] as? String) ?? (json["url"] as? String),
+                  let url = URL(string: returned), url.scheme == "https",
+                  url.host == "www.pixelhost.fun" || url.host == "pixelhost.fun" else {
+                artworkUploadStatus = "PixelHost rejected cover"
+                return nil
+            }
+            var check = URLRequest(url: url)
+            check.timeoutInterval = 12
+            let (bytes, imageResponse) = try await URLSession.shared.data(for: check)
+            guard let imageHTTP = imageResponse as? HTTPURLResponse,
+                  (200...299).contains(imageHTTP.statusCode),
+                  imageHTTP.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("image/") == true,
+                  UIImage(data: bytes) != nil else {
+                artworkUploadStatus = "PixelHost image verification failed"
+                return nil
+            }
+            pixelHostCoverByHash[digest] = returned
+            UserDefaults.standard.set(pixelHostCoverByHash, forKey: "pixelHostCoverURLs")
+            if artworkProvider == "PixelHost" { artworkPublicURL = returned }
+            return returned
+        } catch {
+            artworkUploadStatus = "PixelHost upload failed: " + error.localizedDescription
+            return nil
+        }
+    }
 }
 
 
@@ -2822,50 +2866,7 @@ private struct ResolvedStoreInformation {
         String?
 }
 
-    private func uploadPixelHostCover(data: Data, digest: String) async -> String? {
-        if let cached = pixelHostCoverByHash[digest] { return cached }
-        guard let endpoint = URL(string: "https://www.pixelhost.fun/api/upload") else { return nil }
-        let boundary = "MusicPresence-\(UUID().uuidString)"
-        var body = Data()
-        func append(_ value: String) { body.append(Data(value.utf8)) }
-        append("--\(boundary)\r\n")
-        append("Content-Disposition: form-data; name=\"files\"; filename=\"cover.jpg\"\r\n")
-        append("Content-Type: image/jpeg\r\n\r\n")
-        body.append(data)
-        append("\r\n--\(boundary)--\r\n")
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 25
-        do {
-            let (responseData, response) = try await URLSession.shared.upload(for: request, from: body)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
-                  let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any],
-                  let returned = (json["direct"] as? String) ?? (json["url"] as? String),
-                  let url = URL(string: returned), url.scheme == "https",
-                  url.host == "www.pixelhost.fun" || url.host == "pixelhost.fun" else {
-                artworkUploadStatus = "PixelHost rejected cover"
-                return nil
-            }
-            var check = URLRequest(url: url)
-            check.timeoutInterval = 12
-            let (bytes, imageResponse) = try await URLSession.shared.data(for: check)
-            guard let imageHTTP = imageResponse as? HTTPURLResponse,
-                  (200...299).contains(imageHTTP.statusCode),
-                  imageHTTP.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("image/") == true,
-                  UIImage(data: bytes) != nil else {
-                artworkUploadStatus = "PixelHost image verification failed"
-                return nil
-            }
-            pixelHostCoverByHash[digest] = returned
-            UserDefaults.standard.set(pixelHostCoverByHash, forKey: "pixelHostCoverURLs")
-            if artworkProvider == "PixelHost" { artworkPublicURL = returned }
-            return returned
-        } catch {
-            artworkUploadStatus = "PixelHost upload failed: " + error.localizedDescription
-            return nil
-        }
-    }
+
 
 
 
