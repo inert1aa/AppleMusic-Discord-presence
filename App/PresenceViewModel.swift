@@ -145,61 +145,75 @@ final class PresenceViewModel: ObservableObject {
 
     private var artworkUploadsInProgress = Set<String>()
 
-    private func cachedEmbeddedCoverURL(for item: MPMediaItem) -> String? {
-        guard let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
-              let data = image.jpegData(compressionQuality: 0.9) else { return nil }
+    // Use a deterministic, square 1024px JPEG. Letterboxing preserves the
+    // complete cover rather than cropping it; the SHA identifies the image.
+    private func preparedCover(for item: MPMediaItem) -> (hash: String, data: Data)? {
+        guard let image = item.artwork?.image(at: CGSize(width: 1024, height: 1024)),
+              image.size.width > 0, image.size.height > 0 else { return nil }
+        let size = CGSize(width: 1024, height: 1024)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let rendered = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor.black.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            let scale = min(size.width / image.size.width, size.height / image.size.height)
+            let width = image.size.width * scale
+            let height = image.size.height * scale
+            image.draw(in: CGRect(x: (size.width - width) / 2,
+                                  y: (size.height - height) / 2,
+                                  width: width, height: height))
+        }
+        guard let data = rendered.jpegData(compressionQuality: 0.88),
+              data.count <= 10_000_000 else { return nil }
         let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        return uploadedCoverByHash[hash]
+        return (hash, data)
+    }
+
+    private func cachedEmbeddedCoverURL(for item: MPMediaItem) -> String? {
+        guard let cover = preparedCover(for: item) else {
+            artworkUploadStatus = "No embedded artwork available"
+            artworkPublicURL = nil
+            return nil
+        }
+        if let cached = uploadedCoverByHash[cover.hash] {
+            artworkPublicURL = cached
+            artworkUploadStatus = "Cover URL ready; Discord rendering unverified"
+            return cached
+        }
+        artworkPublicURL = nil
+        return nil
     }
 
     private func scheduleEmbeddedCoverUpload(for item: MPMediaItem, identity: String) {
-        guard let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
-              let data = image.jpegData(compressionQuality: 0.9) else { return }
-        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        guard uploadedCoverByHash[hash] == nil,
-              !artworkUploadsInProgress.contains(hash) else { return }
-        artworkUploadStatus = "Uploading embedded cover…"
-        artworkUploadsInProgress.insert(hash)
+        guard let cover = preparedCover(for: item) else {
+            artworkUploadStatus = "No embedded artwork available"
+            return
+        }
+        guard uploadedCoverByHash[cover.hash] == nil,
+              !artworkUploadsInProgress.contains(cover.hash) else { return }
+        artworkUploadsInProgress.insert(cover.hash)
+        artworkUploadStatus = "Uploading 1024px embedded cover…"
         Task { [weak self] in
             guard let self else { return }
-            let url = await self.uploadEmbeddedCover(for: item)
-            self.artworkUploadsInProgress.remove(hash)
-            if url != nil {
-                self.artworkUploadStatus = "Cover URL ready; Discord display not yet verified"
-            }
-            if url != nil,
-               let current = self.player.nowPlayingItem,
-               self.trackIdentity(for: current) == identity {
+            let url = await self.uploadEmbeddedCover(data: cover.data, hash: cover.hash)
+            self.artworkUploadsInProgress.remove(cover.hash)
+            guard let current = self.player.nowPlayingItem,
+                  self.trackIdentity(for: current) == identity else { return }
+            if let url {
+                self.artworkPublicURL = url
+                self.artworkUploadStatus = "Verified image URL; Discord rendering unverified"
                 self.forceRefresh()
             }
         }
     }
 
-    private func uploadEmbeddedCover(for item: MPMediaItem) async -> String? {
-        guard !Task.isCancelled,
-              let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
-              let data = image.jpegData(compressionQuality: 0.9),
-              data.count <= 10_000_000 else {
-            artworkUploadStatus = "No usable embedded cover"
-            return nil
-        }
-
-        let digest = SHA256.hash(data: data)
-            .map { String(format: "%02x", $0) }
-            .joined()
-        if let cached = uploadedCoverByHash[digest] {
-            return cached
-        }
-
-        guard let endpoint = URL(string: "https://catbox.moe/user/api.php") else {
-            return nil
-        }
-
+    private func uploadEmbeddedCover(data: Data, hash: String) async -> String? {
+        if let cached = uploadedCoverByHash[hash] { return cached }
+        guard let endpoint = URL(string: "https://catbox.moe/user/api.php") else { return nil }
         let boundary = "MusicPresence-\(UUID().uuidString)"
         var body = Data()
-        func append(_ string: String) {
-            body.append(Data(string.utf8))
-        }
+        func append(_ string: String) { body.append(Data(string.utf8)) }
         append("--\(boundary)\r\n")
         append("Content-Disposition: form-data; name=\"reqtype\"\r\n\r\n")
         append("fileupload\r\n")
@@ -222,32 +236,28 @@ final class PresenceViewModel: ObservableObject {
                   let returned = String(data: responseData, encoding: .utf8)?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
                   let url = URL(string: returned),
-                  url.scheme == "https",
-                  url.host == "files.catbox.moe" else {
-                let reply = String(data: responseData, encoding: .utf8) ?? "Invalid response"
-                artworkUploadStatus = "Upload rejected: " + String(reply.prefix(90))
+                  url.scheme == "https", url.host == "files.catbox.moe" else {
+                artworkUploadStatus = "Upload rejected: " + String((String(data: responseData, encoding: .utf8) ?? "Invalid response").prefix(90))
                 return nil
             }
 
-            // Verify that the public URL actually serves image bytes, not an HTML error.
-            var verification = URLRequest(url: url)
-            verification.timeoutInterval = 12
-            let (imageBytes, imageResponse) = try await URLSession.shared.data(for: verification)
+            var check = URLRequest(url: url)
+            check.timeoutInterval = 12
+            let (imageBytes, imageResponse) = try await URLSession.shared.data(for: check)
             guard let imageHTTP = imageResponse as? HTTPURLResponse,
                   (200...299).contains(imageHTTP.statusCode),
-                  let contentType = imageHTTP.value(forHTTPHeaderField: "Content-Type"),
-                  contentType.lowercased().hasPrefix("image/"),
+                  imageHTTP.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("image/") == true,
                   UIImage(data: imageBytes) != nil else {
-                artworkUploadStatus = "Host returned an unusable cover image"
+                artworkUploadStatus = "Host did not serve a valid image"
                 return nil
             }
-            uploadedCoverByHash[digest] = returned
-            artworkPublicURL = returned
+
+            uploadedCoverByHash[hash] = returned
             UserDefaults.standard.set(uploadedCoverByHash, forKey: "uploadedEmbeddedCoverURLs")
             return returned
         } catch {
-            artworkUploadStatus = "Upload failed: " + error.localizedDescription
-            print("[Artwork] Embedded cover upload failed:", error)
+            artworkUploadStatus = "Cover upload failed: " + error.localizedDescription
+            print("[Artwork] Upload or verification failed:", error)
             return nil
         }
     }
