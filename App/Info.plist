@@ -12,7 +12,7 @@
     <!-- ====================================== -->
 
     <key>CFBundleDevelopmentRegion</key>
-    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <string>en</string>
 
 
     <key>CFBundleExecutable</key>
@@ -50,7 +50,7 @@
     <key>NSAppleMusicUsageDescription</key>
 
     <string>
-        Apple Musicの再生中の曲をDiscordのステータスに表示するために使用します。
+        Used to display the currently playing Apple Music track in your Discord status.
     </string>
 
 
@@ -61,7 +61,7 @@
     <key>NSLocationWhenInUseUsageDescription</key>
 
     <string>
-        Apple Musicの再生情報をバックグラウンドで同期するために使用します。位置情報そのものは保存・送信しません。
+        Used to keep Apple Music playback information synchronized in the background. Your location is not stored or transmitted.
     </string>
 
 
@@ -72,7 +72,7 @@
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 
     <string>
-        Apple Musicの再生情報をバックグラウンドで継続して同期するために使用します。位置情報そのものは保存・送信しません。
+        Used to continue synchronizing Apple Music playback information in the background. Your location is not stored or transmitted.
     </string>
 
 
