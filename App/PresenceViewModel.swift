@@ -1,6 +1,7 @@
 import Foundation
 import MediaPlayer
 import UIKit
+import CryptoKit
 
 
 @MainActor
@@ -133,6 +134,72 @@ final class PresenceViewModel: ObservableObject {
 
     private var lastArtworkAlbumKey:
         String?
+
+
+    // Only the embedded image is uploaded. The resulting Catbox URL is public.
+    // Cache by image bytes, not by song or album, to support custom versions.
+    private var uploadedCoverByHash: [String: String] =
+        UserDefaults.standard.dictionary(forKey: "uploadedEmbeddedCoverURLs") as? [String: String] ?? [:]
+
+    private func uploadEmbeddedCover(for item: MPMediaItem) async -> String? {
+        guard !Task.isCancelled,
+              let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
+              let data = image.jpegData(compressionQuality: 0.9),
+              data.count <= 10_000_000 else {
+            return nil
+        }
+
+        let digest = SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        if let cached = uploadedCoverByHash[digest] {
+            return cached
+        }
+
+        guard let endpoint = URL(string: "https://catbox.moe/user/api.php") else {
+            return nil
+        }
+
+        let boundary = "MusicPresence-\(UUID().uuidString)"
+        var body = Data()
+        func append(_ string: String) {
+            body.append(Data(string.utf8))
+        }
+        append("--\(boundary)\r\n")
+        append("Content-Disposition: form-data; name=\"reqtype\"\r\n\r\n")
+        append("fileupload\r\n")
+        append("--\(boundary)\r\n")
+        append("Content-Disposition: form-data; name=\"fileToUpload\"; filename=\"cover.jpg\"\r\n")
+        append("Content-Type: image/jpeg\r\n\r\n")
+        body.append(data)
+        append("\r\n--\(boundary)--\r\n")
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 25
+
+        do {
+            let (responseData, response) = try await URLSession.shared.upload(for: request, from: body)
+            guard !Task.isCancelled,
+                  let http = response as? HTTPURLResponse,
+                  (200...299).contains(http.statusCode),
+                  let returned = String(data: responseData, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                  let url = URL(string: returned),
+                  url.scheme == "https",
+                  url.host == "files.catbox.moe" else {
+                return nil
+            }
+
+            uploadedCoverByHash[digest] = returned
+            UserDefaults.standard.set(uploadedCoverByHash, forKey: "uploadedEmbeddedCoverURLs")
+            return returned
+        } catch {
+            print("[Artwork] Embedded cover upload failed:", error)
+            return nil
+        }
+    }
 
 
     // MARK: =====================================
@@ -1340,22 +1407,13 @@ final class PresenceViewModel: ObservableObject {
             )
 
 
-        let resolved =
-            await
-            resolveStoreInformation(
-                item:
-                    item,
-                identity:
-                    currentIdentity,
-                title:
-                    title,
-                artist:
-                    artistName,
-                album:
-                    album,
-                albumKey:
-                    albumKey
-            )
+        // Upload the cover actually embedded in the playing song.
+        // Do not substitute Apple's online artwork for custom local files.
+        let embeddedCoverURL = await uploadEmbeddedCover(for: item)
+        let resolved = ResolvedStoreInformation(
+            songURL: fallbackSongURL(item: item),
+            artworkURL: embeddedCoverURL
+        )
 
 
         guard
