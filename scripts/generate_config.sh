@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${DISCORD_APP_ID:?DISCORD_APP_ID is required}"
+: "${DISCORD_APP_ID:=1571251144280244225}"
 
 cat > App/Config.generated.swift <<EOF
 import Foundation
