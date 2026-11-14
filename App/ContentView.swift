@@ -99,6 +99,16 @@ struct ContentView: View {
                                 .font(.footnote)
                                 .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
+                            if let url = model.artworkPublicURL,
+                               let destination = URL(string: url) {
+                                Link("Open uploaded cover", destination: destination)
+                                    .font(.footnote)
+                                Text(url)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                                    .lineLimit(2)
+                            }
                         }
 
                         Button {
