@@ -19,6 +19,12 @@ final class PresenceViewModel: ObservableObject {
     @Published var artworkPublicURL: String?
     @Published var artworkProvider: String = UserDefaults.standard.string(forKey: "artworkProvider") ?? "Catbox"
     @Published var cloudEndpoint = UserDefaults.standard.string(forKey: "cloudArtworkEndpoint") ?? ""
+    @Published var cloudToken = UserDefaults.standard.string(forKey: "cloudArtworkToken") ?? ""
+
+    func saveCloudToken(_ value: String) {
+        cloudToken = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.set(cloudToken, forKey: "cloudArtworkToken")
+    }
 
     func saveCloudEndpoint(_ value: String) {
         cloudEndpoint = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2797,6 +2803,7 @@ final class PresenceViewModel: ObservableObject {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "PUT"
         request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer " + cloudToken, forHTTPHeaderField: "Authorization")
         request.setValue(digest, forHTTPHeaderField: "X-Image-SHA256")
         request.timeoutInterval = 25
         do {
