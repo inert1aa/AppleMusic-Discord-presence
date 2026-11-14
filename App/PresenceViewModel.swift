@@ -16,6 +16,7 @@ final class PresenceViewModel: ObservableObject {
 
     @Published var embeddedArtwork: UIImage?
     @Published var artworkUploadStatus = "Waiting for artwork"
+    @Published var artworkPublicURL: String?
 
     @Published var artist =
         "Not Available"
@@ -164,7 +165,7 @@ final class PresenceViewModel: ObservableObject {
             let url = await self.uploadEmbeddedCover(for: item)
             self.artworkUploadsInProgress.remove(hash)
             if url != nil {
-                self.artworkUploadStatus = "Cover uploaded; refreshing Discord"
+                self.artworkUploadStatus = "Cover URL ready; Discord display not yet verified"
             }
             if url != nil,
                let current = self.player.nowPlayingItem,
@@ -228,7 +229,20 @@ final class PresenceViewModel: ObservableObject {
                 return nil
             }
 
+            // Verify that the public URL actually serves image bytes, not an HTML error.
+            var verification = URLRequest(url: url)
+            verification.timeoutInterval = 12
+            let (imageBytes, imageResponse) = try await URLSession.shared.data(for: verification)
+            guard let imageHTTP = imageResponse as? HTTPURLResponse,
+                  (200...299).contains(imageHTTP.statusCode),
+                  let contentType = imageHTTP.value(forHTTPHeaderField: "Content-Type"),
+                  contentType.lowercased().hasPrefix("image/"),
+                  UIImage(data: imageBytes) != nil else {
+                artworkUploadStatus = "Host returned an unusable cover image"
+                return nil
+            }
             uploadedCoverByHash[digest] = returned
+            artworkPublicURL = returned
             UserDefaults.standard.set(uploadedCoverByHash, forKey: "uploadedEmbeddedCoverURLs")
             return returned
         } catch {
