@@ -4,6 +4,8 @@ struct ContentView: View {
     @ObservedObject var model: PresenceViewModel
     @ObservedObject var locationProbe: LocationPermissionProbe
     @State private var showLocationDiagnostics = false
+    @State private var cloudURLDraft = ""
+    @State private var showAdvanced = false
 
     private let accent = Color(red: 0.62, green: 0.47, blue: 1.0)
     private let panel = Color(red: 0.12, green: 0.12, blue: 0.17)
@@ -13,10 +15,12 @@ struct ContentView: View {
             ScrollView {
                 VStack(spacing: 22) {
                     header
+                    connectionStrip
                     nowPlaying
                     discordPanel
                     artworkPanel
                     settingsPanel
+                    advancedPanel
                     Text("Music Presence • Local artwork stays yours until uploaded to a public image host.")
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.38))
@@ -50,6 +54,21 @@ struct ContentView: View {
                 .frame(width: 50, height: 50)
                 .background(panel, in: RoundedRectangle(cornerRadius: 16))
         }
+    }
+
+    private var connectionStrip: some View {
+        HStack(spacing: 12) {
+            Label(model.musicStatus, systemImage: "music.note")
+                .lineLimit(1)
+            Spacer()
+            Label(model.isDiscordReady ? "Discord Live" : "Discord Offline",
+                  systemImage: model.isDiscordReady ? "checkmark.circle.fill" : "circle.dashed")
+                .foregroundStyle(model.isDiscordReady ? .green : .orange)
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.white.opacity(0.8))
+        .padding(14)
+        .background(panel, in: RoundedRectangle(cornerRadius: 16))
     }
 
     private var nowPlaying: some View {
@@ -142,8 +161,28 @@ struct ContentView: View {
             )) {
                 Text("Catbox").tag("Catbox")
                 Text("PixelHost").tag("PixelHost")
+                Text("Cloud").tag("Cloud")
             }
             .pickerStyle(.segmented)
+            if model.artworkProvider == "Cloud" {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Private artwork service")
+                        .font(.caption.weight(.semibold))
+                    TextField("https://your-worker.workers.dev/upload", text: $cloudURLDraft)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Save cloud endpoint") {
+                        model.saveCloudEndpoint(cloudURLDraft)
+                    }
+                    .buttonStyle(.bordered)
+                    Text("Cloud hosting must be deployed separately. No server is included in the IPA.")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+                .onAppear { cloudURLDraft = model.cloudEndpoint }
+            }
             Text(model.artworkUploadStatus)
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.75))
@@ -163,6 +202,32 @@ struct ContentView: View {
             Text("Catbox retains your existing working cover URLs. PixelHost uses a separate cache.")
                 .font(.caption2)
                 .foregroundStyle(.white.opacity(0.45))
+        }
+        .padding(20)
+        .background(panel, in: RoundedRectangle(cornerRadius: 24))
+    }
+
+    private var advancedPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation { showAdvanced.toggle() }
+            } label: {
+                HStack {
+                    Label("Diagnostics & Details", systemImage: "stethoscope")
+                    Spacer()
+                    Image(systemName: showAdvanced ? "chevron.up" : "chevron.down")
+                }
+                .font(.headline)
+                .foregroundStyle(.white)
+            }
+            if showAdvanced {
+                LabeledContent("Artwork host", value: model.artworkProvider)
+                LabeledContent("Connection", value: model.discordStatus)
+                LabeledContent("Music", value: model.musicStatus)
+                Text("A verified image URL does not guarantee Discord will render it.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.55))
+            }
         }
         .padding(20)
         .background(panel, in: RoundedRectangle(cornerRadius: 24))
