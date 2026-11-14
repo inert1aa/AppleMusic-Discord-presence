@@ -5,210 +5,180 @@ struct ContentView: View {
     @ObservedObject var locationProbe: LocationPermissionProbe
     @State private var showLocationDiagnostics = false
 
+    private let accent = Color(red: 0.62, green: 0.47, blue: 1.0)
+    private let panel = Color(red: 0.12, green: 0.12, blue: 0.17)
+
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                ScrollView {
-                VStack(spacing: 20) {
-
-                    // MARK: - Apple Music
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Apple Music")
-                            .font(.headline)
-
-                        HStack {
-                            Text("Status")
-                                .foregroundStyle(.secondary)
-
-                            Spacer()
-
-                            Text(model.musicStatus)
-                        }
-
-                        Divider()
-
-                        HStack(spacing: 12) {
-                            if let artwork = model.embeddedArtwork {
-                                Image(uiImage: artwork)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 84, height: 84)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .accessibilityLabel("Embedded album artwork")
-                            } else {
-                                Image(systemName: "music.note")
-                                    .frame(width: 84, height: 84)
-                                    .background(.quaternary)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(model.trackTitle)
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                    .lineLimit(2)
-                                    .minimumScaleFactor(0.85)
-
-                                if !model.artist.isEmpty {
-                                    Text(model.artist)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(.regularMaterial)
-                    )
-
-                    // MARK: - Discord
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Discord")
-                            .font(.headline)
-
-                        HStack(alignment: .top, spacing: 12) {
-                            Text("Connection Status")
-                                .foregroundStyle(.secondary)
-
-                            Spacer()
-
-                            HStack(spacing: 6) {
-                                Circle()
-                                    .fill(
-                                        model.isDiscordReady
-                                        ? Color.green
-                                        : Color.orange
-                                    )
-                                    .frame(width: 8, height: 8)
-
-                                Text(model.discordStatus)
-                                    .multilineTextAlignment(.trailing)
-                                    .lineLimit(3)
-                            }
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Cover Artwork")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Text(model.artworkUploadStatus)
-                                .font(.footnote)
-                                .textSelection(.enabled)
-                                .fixedSize(horizontal: false, vertical: true)
-                            if let url = model.artworkPublicURL,
-                               let destination = URL(string: url) {
-                                Link("Open uploaded cover", destination: destination)
-                                    .font(.footnote)
-                                Text(url)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .textSelection(.enabled)
-                                    .lineLimit(2)
-                            }
-                        }
-
-                        Button {
-                            model.connectDiscord()
-                        } label: {
-                            Text(
-                                model.isDiscordReady
-                                ? "Discord Connected"
-                                : "Connect to Discord"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(model.isDiscordReady)
-
-                        Button {
-                            model.forceRefresh()
-                        } label: {
-                            Label(
-                                "Update Discord with Current Song",
-                                systemImage: "arrow.clockwise"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!model.isDiscordReady)
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(.regularMaterial)
-                    )
-
-                    // MARK: - Auto Update
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Toggle(
-                            "Auto Update",
-                            isOn: $model.autoUpdate
-                        )
-
-                        Text(
-                            "Automatically update Discord when the song changes in Apple Music."
-                        )
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(.regularMaterial)
-                    )
+            ScrollView {
+                VStack(spacing: 22) {
+                    header
+                    nowPlaying
+                    discordPanel
+                    artworkPanel
+                    settingsPanel
+                    Text("Music Presence • Local artwork stays yours until uploaded to a public image host.")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.38))
+                        .multilineTextAlignment(.center)
+                        .padding(.bottom, 18)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .top)
-                .frame(minHeight: geometry.size.height, alignment: .top)
-                }
-                .frame(width: geometry.size.width, height: geometry.size.height)
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("Music Presence")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        locationProbe.refresh()
-                        showLocationDiagnostics = true
-                    } label: {
-                        Image(systemName: "location.circle")
-                    }
-                    .accessibilityLabel("Location Diagnostics")
-                }
-            }
-            .sheet(isPresented: $showLocationDiagnostics) {
-                NavigationStack {
-                    Form {
-                        Section("Location Permission") {
-                            LabeledContent("Permission", value: locationProbe.statusText)
-                            LabeledContent("Usage Description", value: locationProbe.hasUsageDescription ? "Available" : "Missing")
-                            LabeledContent("Background Location", value: locationProbe.hasBackgroundLocation ? "Available" : "Missing")
-                        }
-                        Section {
-                            Button("Request Location Permission") {
-                                locationProbe.requestPermission()
-                            }
-                            Button("Refresh Status") {
-                                locationProbe.refresh()
-                            }
-                        }
-                    }
-                    .navigationTitle("Location Diagnostics")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") { showLocationDiagnostics = false }
-                        }
-                    }
-                }
-            }
+            .background(Color(red: 0.055, green: 0.055, blue: 0.09).ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .preferredColorScheme(.dark)
         }
+    }
+
+    private var header: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("MUSIC PRESENCE")
+                    .font(.caption.weight(.bold))
+                    .tracking(3)
+                    .foregroundStyle(accent)
+                Text("Your music. On Discord.")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.white)
+            }
+            Spacer()
+            Image(systemName: "waveform")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(accent)
+                .frame(width: 50, height: 50)
+                .background(panel, in: RoundedRectangle(cornerRadius: 16))
+        }
+    }
+
+    private var nowPlaying: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(accent.opacity(0.12))
+                if let image = model.embeddedArtwork {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .padding(12)
+                } else {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 65))
+                        .foregroundStyle(accent)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .aspectRatio(1, contentMode: .fit)
+
+            VStack(spacing: 6) {
+                Text(model.trackTitle)
+                    .font(.title2.weight(.bold))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                Text(model.artist)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.65))
+                    .lineLimit(2)
+                Text(model.musicStatus)
+                    .font(.caption)
+                    .foregroundStyle(accent)
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+        }
+        .padding(18)
+        .background(panel, in: RoundedRectangle(cornerRadius: 28))
+    }
+
+    private var discordPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label("Discord Presence", systemImage: "dot.radiowaves.left.and.right")
+                    .font(.headline)
+                Spacer()
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(model.isDiscordReady ? .green : .orange)
+                        .frame(width: 8, height: 8)
+                    Text(model.isDiscordReady ? "Connected" : "Offline")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(.white.opacity(0.75))
+            }
+            Text(model.discordStatus)
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.6))
+            Button {
+                if model.isDiscordReady {
+                    model.forceRefresh()
+                } else {
+                    model.connectDiscord()
+                }
+            } label: {
+                Label(model.isDiscordReady ? "Refresh Discord Presence" : "Connect to Discord",
+                      systemImage: model.isDiscordReady ? "arrow.clockwise" : "link")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(accent)
+        }
+        .padding(20)
+        .background(panel, in: RoundedRectangle(cornerRadius: 24))
+    }
+
+    private var artworkPanel: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Label("Artwork Delivery", systemImage: "photo.stack")
+                .font(.headline)
+            Text("Choose which free, no-account host sends your embedded covers to Discord.")
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.6))
+            Picker("Image host", selection: Binding(
+                get: { model.artworkProvider },
+                set: { model.selectArtworkProvider($0) }
+            )) {
+                Text("Catbox").tag("Catbox")
+                Text("PixelHost").tag("PixelHost")
+            }
+            .pickerStyle(.segmented)
+            Text(model.artworkUploadStatus)
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.75))
+                .textSelection(.enabled)
+            if let link = model.artworkPublicURL, let url = URL(string: link) {
+                Link(destination: url) {
+                    Label("View uploaded cover", systemImage: "arrow.up.right.square")
+                        .font(.subheadline.weight(.medium))
+                }
+                .tint(accent)
+                Text(link)
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.45))
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            }
+            Text("Catbox retains your existing working cover URLs. PixelHost uses a separate cache.")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.45))
+        }
+        .padding(20)
+        .background(panel, in: RoundedRectangle(cornerRadius: 24))
+    }
+
+    private var settingsPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Playback Settings", systemImage: "slider.horizontal.3")
+                .font(.headline)
+            Toggle("Automatically update Discord", isOn: $model.autoUpdate)
+                .tint(accent)
+            Text("Track changes are detected automatically while the app can access Apple Music playback.")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.5))
+        }
+        .padding(20)
+        .background(panel, in: RoundedRectangle(cornerRadius: 24))
     }
 }
