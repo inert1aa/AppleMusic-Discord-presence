@@ -17,6 +17,16 @@ final class PresenceViewModel: ObservableObject {
     @Published var embeddedArtwork: UIImage?
     @Published var artworkUploadStatus = "Waiting for artwork"
     @Published var artworkPublicURL: String?
+    @Published var artworkProvider: String = UserDefaults.standard.string(forKey: "artworkProvider") ?? "Catbox"
+
+    func selectArtworkProvider(_ provider: String) {
+        guard provider == "Catbox" || provider == "PixelHost" else { return }
+        artworkProvider = provider
+        UserDefaults.standard.set(provider, forKey: "artworkProvider")
+        artworkPublicURL = nil
+        forceRefresh()
+    }
+
 
     @Published var artist =
         "Not Available"
@@ -143,6 +153,13 @@ final class PresenceViewModel: ObservableObject {
     private var uploadedCoverByHash: [String: String] =
         UserDefaults.standard.dictionary(forKey: "uploadedEmbeddedCoverURLs") as? [String: String] ?? [:]
 
+    private var pixelHostCoverByHash: [String: String] =
+        UserDefaults.standard.dictionary(forKey: "pixelHostCoverURLs") as? [String: String] ?? [:]
+
+    private var activeCoverCache: [String: String] {
+        artworkProvider == "PixelHost" ? pixelHostCoverByHash : uploadedCoverByHash
+    }
+
     private var artworkUploadsInProgress = Set<String>()
 
     private func cachedEmbeddedCoverURL(for item: MPMediaItem) -> String? {
@@ -155,7 +172,7 @@ final class PresenceViewModel: ObservableObject {
             return nil
         }
         let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        if let url = uploadedCoverByHash[hash] {
+        if let url = activeCoverCache[hash] {
             artworkPublicURL = url
             artworkUploadStatus = "Cached embedded cover ready; Discord display not yet verified"
             return url
@@ -170,14 +187,15 @@ final class PresenceViewModel: ObservableObject {
         guard let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
               let data = image.jpegData(compressionQuality: 0.9) else { return }
         let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        guard uploadedCoverByHash[hash] == nil,
-              !artworkUploadsInProgress.contains(hash) else { return }
+        guard activeCoverCache[hash] == nil,
+              !artworkUploadsInProgress.contains(artworkProvider + ":" + hash) else { return }
         artworkUploadStatus = "Uploading embedded cover…"
-        artworkUploadsInProgress.insert(hash)
+        let providerAtStart = artworkProvider
+        artworkUploadsInProgress.insert(providerAtStart + ":" + hash)
         Task { [weak self] in
             guard let self else { return }
-            let url = await self.uploadEmbeddedCover(for: item)
-            self.artworkUploadsInProgress.remove(hash)
+            let url = await self.uploadEmbeddedCover(for: item, provider: providerAtStart)
+            self.artworkUploadsInProgress.remove(providerAtStart + ":" + hash)
             if url != nil {
                 self.artworkUploadStatus = "Cover URL ready; Discord display not yet verified"
             }
@@ -189,7 +207,7 @@ final class PresenceViewModel: ObservableObject {
         }
     }
 
-    private func uploadEmbeddedCover(for item: MPMediaItem) async -> String? {
+    private func uploadEmbeddedCover(for item: MPMediaItem, provider: String) async -> String? {
         guard !Task.isCancelled,
               let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
               let data = image.jpegData(compressionQuality: 0.9),
@@ -203,6 +221,10 @@ final class PresenceViewModel: ObservableObject {
             .joined()
         if let cached = uploadedCoverByHash[digest] {
             return cached
+        }
+
+        if provider == "PixelHost" {
+            return await uploadPixelHostCover(data: data, digest: digest)
         }
 
         guard let endpoint = URL(string: "https://catbox.moe/user/api.php") else {
@@ -2798,4 +2820,50 @@ private struct ResolvedStoreInformation {
 
     let artworkURL:
         String?
-}
+}    private func uploadPixelHostCover(data: Data, digest: String) async -> String? {
+        if let cached = pixelHostCoverByHash[digest] { return cached }
+        guard let endpoint = URL(string: "https://www.pixelhost.fun/api/upload") else { return nil }
+        let boundary = "MusicPresence-\(UUID().uuidString)"
+        var body = Data()
+        func append(_ value: String) { body.append(Data(value.utf8)) }
+        append("--\(boundary)\r\n")
+        append("Content-Disposition: form-data; name=\"files\"; filename=\"cover.jpg\"\r\n")
+        append("Content-Type: image/jpeg\r\n\r\n")
+        body.append(data)
+        append("\r\n--\(boundary)--\r\n")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 25
+        do {
+            let (responseData, response) = try await URLSession.shared.upload(for: request, from: body)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                  let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any],
+                  let returned = (json["direct"] as? String) ?? (json["url"] as? String),
+                  let url = URL(string: returned), url.scheme == "https",
+                  url.host == "www.pixelhost.fun" || url.host == "pixelhost.fun" else {
+                artworkUploadStatus = "PixelHost rejected cover"
+                return nil
+            }
+            var check = URLRequest(url: url)
+            check.timeoutInterval = 12
+            let (bytes, imageResponse) = try await URLSession.shared.data(for: check)
+            guard let imageHTTP = imageResponse as? HTTPURLResponse,
+                  (200...299).contains(imageHTTP.statusCode),
+                  imageHTTP.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("image/") == true,
+                  UIImage(data: bytes) != nil else {
+                artworkUploadStatus = "PixelHost image verification failed"
+                return nil
+            }
+            pixelHostCoverByHash[digest] = returned
+            UserDefaults.standard.set(pixelHostCoverByHash, forKey: "pixelHostCoverURLs")
+            if artworkProvider == "PixelHost" { artworkPublicURL = returned }
+            return returned
+        } catch {
+            artworkUploadStatus = "PixelHost upload failed: " + error.localizedDescription
+            return nil
+        }
+    }
+
+
+
