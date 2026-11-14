@@ -5,6 +5,7 @@ struct ContentView: View {
     @ObservedObject var locationProbe: LocationPermissionProbe
     @State private var showLocationDiagnostics = false
     @State private var cloudURLDraft = ""
+    @State private var cloudTokenDraft = ""
     @State private var showAdvanced = false
 
     private let accent = Color(red: 0.62, green: 0.47, blue: 1.0)
@@ -173,7 +174,10 @@ struct ContentView: View {
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                         .textFieldStyle(.roundedBorder)
-                    Button("Save cloud endpoint") {
+                    SecureField("Upload token", text: $cloudTokenDraft)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Save cloud configuration") {
+                        model.saveCloudToken(cloudTokenDraft)
                         model.saveCloudEndpoint(cloudURLDraft)
                     }
                     .buttonStyle(.bordered)
@@ -181,7 +185,10 @@ struct ContentView: View {
                         .font(.caption2)
                         .foregroundStyle(.orange)
                 }
-                .onAppear { cloudURLDraft = model.cloudEndpoint }
+                .onAppear {
+                    cloudURLDraft = model.cloudEndpoint
+                    cloudTokenDraft = model.cloudToken
+                }
             }
             Text(model.artworkUploadStatus)
                 .font(.footnote)
