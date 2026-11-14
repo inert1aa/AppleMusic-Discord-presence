@@ -13,6 +13,8 @@ final class PresenceViewModel: ObservableObject {
     @Published var trackTitle =
         "未取得"
 
+    @Published var embeddedArtwork: UIImage?
+
     @Published var artist =
         "未取得"
 
@@ -978,6 +980,8 @@ final class PresenceViewModel: ObservableObject {
 
         updatePlaybackStateText()
 
+        // Show the actual embedded cover from the Music library immediately.
+        embeddedArtwork = player.nowPlayingItem?.artwork?.image(at: CGSize(width: 600, height: 600))
 
         // MARK: No current song
 
