@@ -7,7 +7,8 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            GeometryReader { geometry in
+                ScrollView {
                 VStack(spacing: 20) {
 
                     // MARK: - Apple Music
@@ -143,10 +144,14 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .frame(maxWidth: 700)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .frame(minHeight: geometry.size.height, alignment: .top)
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle("Music Presence")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
