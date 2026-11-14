@@ -18,9 +18,16 @@ final class PresenceViewModel: ObservableObject {
     @Published var artworkUploadStatus = "Waiting for artwork"
     @Published var artworkPublicURL: String?
     @Published var artworkProvider: String = UserDefaults.standard.string(forKey: "artworkProvider") ?? "Catbox"
+    @Published var cloudEndpoint = UserDefaults.standard.string(forKey: "cloudArtworkEndpoint") ?? ""
+
+    func saveCloudEndpoint(_ value: String) {
+        cloudEndpoint = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.set(cloudEndpoint, forKey: "cloudArtworkEndpoint")
+        if artworkProvider == "Cloud" { forceRefresh() }
+    }
 
     func selectArtworkProvider(_ provider: String) {
-        guard provider == "Catbox" || provider == "PixelHost" else { return }
+        guard ["Catbox", "PixelHost", "Cloud"].contains(provider) else { return }
         artworkProvider = provider
         UserDefaults.standard.set(provider, forKey: "artworkProvider")
         artworkPublicURL = nil
@@ -156,8 +163,15 @@ final class PresenceViewModel: ObservableObject {
     private var pixelHostCoverByHash: [String: String] =
         UserDefaults.standard.dictionary(forKey: "pixelHostCoverURLs") as? [String: String] ?? [:]
 
+    private var cloudCoverByHash: [String: String] =
+        UserDefaults.standard.dictionary(forKey: "cloudCoverURLs") as? [String: String] ?? [:]
+
     private var activeCoverCache: [String: String] {
-        artworkProvider == "PixelHost" ? pixelHostCoverByHash : uploadedCoverByHash
+        switch artworkProvider {
+        case "PixelHost": return pixelHostCoverByHash
+        case "Cloud": return cloudCoverByHash
+        default: return uploadedCoverByHash
+        }
     }
 
     private var artworkUploadsInProgress = Set<String>()
@@ -199,7 +213,7 @@ final class PresenceViewModel: ObservableObject {
             if url != nil {
                 self.artworkUploadStatus = "Cover URL ready; Discord display not yet verified"
             }
-            if url != nil,
+            if url != nil, self.artworkProvider == providerAtStart,
                let current = self.player.nowPlayingItem,
                self.trackIdentity(for: current) == identity {
                 self.forceRefresh()
@@ -225,6 +239,9 @@ final class PresenceViewModel: ObservableObject {
 
         if provider == "PixelHost" {
             return await uploadPixelHostCover(data: data, digest: digest)
+        }
+        if provider == "Cloud" {
+            return await uploadCloudCover(data: data, digest: digest)
         }
 
         guard let endpoint = URL(string: "https://catbox.moe/user/api.php") else {
@@ -2769,6 +2786,49 @@ final class PresenceViewModel: ObservableObject {
                 )
         }
     }
+    private func uploadCloudCover(data: Data, digest: String) async -> String? {
+        guard let endpoint = URL(string: cloudEndpoint),
+              endpoint.scheme == "https",
+              endpoint.user == nil, endpoint.password == nil,
+              endpoint.query == nil, endpoint.fragment == nil else {
+            artworkUploadStatus = "Configure your HTTPS cloud endpoint first"
+            return nil
+        }
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "PUT"
+        request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+        request.setValue(digest, forHTTPHeaderField: "X-Image-SHA256")
+        request.timeoutInterval = 25
+        do {
+            let (responseData, response) = try await URLSession.shared.upload(for: request, from: data)
+            guard let http = response as? HTTPURLResponse,
+                  (200...299).contains(http.statusCode),
+                  let payload = try JSONSerialization.jsonObject(with: responseData) as? [String: Any],
+                  let address = payload["url"] as? String,
+                  let url = URL(string: address), url.scheme == "https" else {
+                artworkUploadStatus = "Cloud upload rejected"
+                return nil
+            }
+            var verification = URLRequest(url: url)
+            verification.timeoutInterval = 12
+            let (bytes, imageResponse) = try await URLSession.shared.data(for: verification)
+            guard let imageHTTP = imageResponse as? HTTPURLResponse,
+                  (200...299).contains(imageHTTP.statusCode),
+                  imageHTTP.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("image/") == true,
+                  UIImage(data: bytes) != nil else {
+                artworkUploadStatus = "Cloud image verification failed"
+                return nil
+            }
+            cloudCoverByHash[digest] = address
+            UserDefaults.standard.set(cloudCoverByHash, forKey: "cloudCoverURLs")
+            if artworkProvider == "Cloud" { artworkPublicURL = address }
+            return address
+        } catch {
+            artworkUploadStatus = "Cloud upload failed: " + error.localizedDescription
+            return nil
+        }
+    }
+
     private func uploadPixelHostCover(data: Data, digest: String) async -> String? {
         if let cached = pixelHostCoverByHash[digest] { return cached }
         guard let endpoint = URL(string: "https://www.pixelhost.fun/api/upload") else { return nil }
