@@ -15,6 +15,7 @@ final class PresenceViewModel: ObservableObject {
         "Not Available"
 
     @Published var embeddedArtwork: UIImage?
+    @Published var artworkUploadStatus = "Waiting for artwork"
 
     @Published var artist =
         "Not Available"
@@ -156,11 +157,15 @@ final class PresenceViewModel: ObservableObject {
         let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         guard uploadedCoverByHash[hash] == nil,
               !artworkUploadsInProgress.contains(hash) else { return }
+        artworkUploadStatus = "Uploading embedded cover…"
         artworkUploadsInProgress.insert(hash)
         Task { [weak self] in
             guard let self else { return }
             let url = await self.uploadEmbeddedCover(for: item)
             self.artworkUploadsInProgress.remove(hash)
+            if url != nil {
+                self.artworkUploadStatus = "Cover uploaded; refreshing Discord"
+            }
             if url != nil,
                let current = self.player.nowPlayingItem,
                self.trackIdentity(for: current) == identity {
@@ -174,6 +179,7 @@ final class PresenceViewModel: ObservableObject {
               let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
               let data = image.jpegData(compressionQuality: 0.9),
               data.count <= 10_000_000 else {
+            artworkUploadStatus = "No usable embedded cover"
             return nil
         }
 
@@ -217,6 +223,8 @@ final class PresenceViewModel: ObservableObject {
                   let url = URL(string: returned),
                   url.scheme == "https",
                   url.host == "files.catbox.moe" else {
+                let reply = String(data: responseData, encoding: .utf8) ?? "Invalid response"
+                artworkUploadStatus = "Upload rejected: " + String(reply.prefix(90))
                 return nil
             }
 
@@ -224,6 +232,7 @@ final class PresenceViewModel: ObservableObject {
             UserDefaults.standard.set(uploadedCoverByHash, forKey: "uploadedEmbeddedCoverURLs")
             return returned
         } catch {
+            artworkUploadStatus = "Upload failed: " + error.localizedDescription
             print("[Artwork] Embedded cover upload failed:", error)
             return nil
         }
