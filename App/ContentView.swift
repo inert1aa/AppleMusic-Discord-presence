@@ -65,7 +65,7 @@ struct ContentView: View {
                             .font(.headline)
 
                         HStack {
-                            Text("接続Status")
+                            Text("Connection Status")
                                 .foregroundStyle(.secondary)
 
                             Spacer()
@@ -123,7 +123,7 @@ struct ContentView: View {
                         )
 
                         Text(
-                            "Apple Musicの曲変更を検出して、Discordの表示をAuto Updateします。"
+                            "Automatically update Discord when the song changes in Apple Music."
                         )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
