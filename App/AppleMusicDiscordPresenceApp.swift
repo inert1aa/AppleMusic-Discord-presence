@@ -16,107 +16,11 @@ struct AppleMusicDiscordPresenceApp: App {
 
 
     var body: some Scene {
-
         WindowGroup {
-
-            VStack(
-                spacing: 0
-            ) {
-
-                // MARK: =========================
-                // MARK: Location Debug
-                // MARK: =========================
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 8
-                ) {
-
-                    Text(
-                        "Location Diagnostics"
-                    )
-                    .font(
-                        .headline
-                    )
-
-
-                    Text(
-                        "Permission: \(locationProbe.statusText)"
-                    )
-
-
-                    Text(
-                        "UsageDescription: \(locationProbe.hasUsageDescription ? "Available" : "Missing")"
-                    )
-
-
-                    Text(
-                        "Background location: \(locationProbe.hasBackgroundLocation ? "Available" : "Missing")"
-                    )
-
-
-                    Button {
-
-                        locationProbe
-                            .requestPermission()
-
-                    } label: {
-
-                        Text(
-                            "Request Location Permission"
-                        )
-                        .frame(
-                            maxWidth:
-                                .infinity
-                        )
-                    }
-                    .buttonStyle(
-                        .borderedProminent
-                    )
-
-
-                    Button {
-
-                        locationProbe
-                            .refresh()
-
-                    } label: {
-
-                        Text(
-                            "Refresh Status"
-                        )
-                        .frame(
-                            maxWidth:
-                                .infinity
-                        )
-                    }
-                    .buttonStyle(
-                        .bordered
-                    )
+            ContentView(model: model, locationProbe: locationProbe)
+                .task {
+                    await model.start()
                 }
-                .padding()
-                .background(
-                    .thinMaterial
-                )
-
-
-                Divider()
-
-
-                // MARK: =========================
-                // MARK: Original App
-                // MARK: =========================
-
-                ContentView(
-                    model:
-                        model
-                )
-            }
-            .task {
-
-                await model
-                    .start()
-            }
         }
     }
 }
@@ -303,10 +207,10 @@ final class LocationPermissionProbe:
         case .notDetermined:
 
             /*
-             ボタンを人間が押しているので
-             アプリは確実にForeground。
+             The user pressed the button, so the app is in the foreground.
+             
 
-             ここで直接要求する。
+             Request permission directly here.
              */
 
             print(
@@ -325,7 +229,7 @@ final class LocationPermissionProbe:
 
 
             /*
-             Background側の処理も開始。
+             Also start background activity.
              */
 
             BackgroundLocationKeeper
