@@ -15,7 +15,7 @@ struct ContentView: View {
                             .font(.headline)
 
                         HStack {
-                            Text("状態")
+                            Text("Status")
                                 .foregroundStyle(.secondary)
 
                             Spacer()
@@ -65,7 +65,7 @@ struct ContentView: View {
                             .font(.headline)
 
                         HStack {
-                            Text("接続状態")
+                            Text("接続Status")
                                 .foregroundStyle(.secondary)
 
                             Spacer()
@@ -88,8 +88,8 @@ struct ContentView: View {
                         } label: {
                             Text(
                                 model.isDiscordReady
-                                ? "Discord 接続済み"
-                                : "Discord に接続"
+                                ? "Discord Connected"
+                                : "Connect to Discord"
                             )
                             .frame(maxWidth: .infinity)
                         }
@@ -100,7 +100,7 @@ struct ContentView: View {
                             model.forceRefresh()
                         } label: {
                             Label(
-                                "今の曲をDiscordへ反映",
+                                "Update Discord with Current Song",
                                 systemImage: "arrow.clockwise"
                             )
                             .frame(maxWidth: .infinity)
@@ -114,16 +114,16 @@ struct ContentView: View {
                             .fill(.regularMaterial)
                     )
 
-                    // MARK: - 自動更新
+                    // MARK: - Auto Update
 
                     VStack(alignment: .leading, spacing: 12) {
                         Toggle(
-                            "自動更新",
+                            "Auto Update",
                             isOn: $model.autoUpdate
                         )
 
                         Text(
-                            "Apple Musicの曲変更を検出して、Discordの表示を自動更新します。"
+                            "Apple Musicの曲変更を検出して、Discordの表示をAuto Updateします。"
                         )
                         .font(.footnote)
                         .foregroundStyle(.secondary)
