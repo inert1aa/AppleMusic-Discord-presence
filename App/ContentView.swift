@@ -112,20 +112,6 @@ struct ContentView: View {
                         }
 
                         Button {
-                            model.toggleDiscordArtworkTest()
-                        } label: {
-                            Label(
-                                model.testDiscordAsset
-                                    ? "Use Embedded Cover (End Test)"
-                                    : "Test Discord App Artwork",
-                                systemImage: "photo.badge.checkmark"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!model.isDiscordReady)
-
-                        Button {
                             model.connectDiscord()
                         } label: {
                             Text(
