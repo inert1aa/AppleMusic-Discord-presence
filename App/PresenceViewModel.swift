@@ -11,18 +11,18 @@ final class PresenceViewModel: ObservableObject {
     // MARK: =====================================
 
     @Published var trackTitle =
-        "未取得"
+        "Not Available"
 
     @Published var embeddedArtwork: UIImage?
 
     @Published var artist =
-        "未取得"
+        "Not Available"
 
     @Published var musicStatus =
-        "停止"
+        "Stopped"
 
     @Published var discordStatus =
-        "未接続"
+        "Disconnected"
 
     @Published var isDiscordReady =
         false
@@ -199,7 +199,7 @@ final class PresenceViewModel: ObservableObject {
         else {
 
             musicStatus =
-                "Apple Music 権限なし"
+                "Apple Music Permission Denied"
 
             return
         }
@@ -260,7 +260,7 @@ final class PresenceViewModel: ObservableObject {
 
 
         /*
-         再生・停止・一時停止など。
+         再生・Stopped・一時Stoppedなど。
          */
 
         observe(
@@ -461,7 +461,7 @@ final class PresenceViewModel: ObservableObject {
         if appID != 0 {
 
             discordStatus =
-                "Discord 自動接続中"
+                "Connecting to Discord Automatically"
 
 
             DiscordBridge
@@ -683,7 +683,7 @@ final class PresenceViewModel: ObservableObject {
         guard appID != 0 else {
 
             discordStatus =
-                "DISCORD_APP_ID が未設定"
+                "Discord Application ID Not Configured"
 
             return
         }
@@ -932,13 +932,13 @@ final class PresenceViewModel: ObservableObject {
         case .paused:
 
             musicStatus =
-                "一時停止"
+                "一時Stopped"
 
 
         case .stopped:
 
             musicStatus =
-                "停止"
+                "Stopped"
 
 
         case .interrupted:
