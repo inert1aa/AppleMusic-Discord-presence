@@ -2820,7 +2820,9 @@ private struct ResolvedStoreInformation {
 
     let artworkURL:
         String?
-}    private func uploadPixelHostCover(data: Data, digest: String) async -> String? {
+}
+
+    private func uploadPixelHostCover(data: Data, digest: String) async -> String? {
         if let cached = pixelHostCoverByHash[digest] { return cached }
         guard let endpoint = URL(string: "https://www.pixelhost.fun/api/upload") else { return nil }
         let boundary = "MusicPresence-\(UUID().uuidString)"
