@@ -2,14 +2,16 @@ name: Build unsigned IPA
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main, dev]
 
 jobs:
   build:
     runs-on: macos-latest
 
     env:
-      DISCORD_APP_ID: ${{ secrets.DISCORD_APP_ID }}
-      BUNDLE_ID: ${{ secrets.BUNDLE_ID }}
+      DISCORD_APP_ID: ${{ secrets.DISCORD_APP_ID || '1571251144280244225' }}
+      BUNDLE_ID: ${{ secrets.BUNDLE_ID || 'com.inert1aa.applemusicdiscordpresence' }}
 
     steps:
       - name: Checkout
