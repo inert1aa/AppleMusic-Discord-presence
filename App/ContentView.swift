@@ -3,34 +3,31 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var model: PresenceViewModel
     @ObservedObject var locationProbe: LocationPermissionProbe
-    @State private var showLocationDiagnostics = false
+    @State private var showAdvanced = false
     @State private var cloudURLDraft = ""
     @State private var cloudTokenDraft = ""
-    @State private var showAdvanced = false
 
-    private let accent = Color(red: 0.62, green: 0.47, blue: 1.0)
+    private let accent = Color(red: 0.62, green: 0.47, blue: 1)
     private let panel = Color(red: 0.12, green: 0.12, blue: 0.17)
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 22) {
+                VStack(alignment: .leading, spacing: 12) {
                     header
-                    connectionStrip
-                    nowPlaying
-                    discordPanel
-                    artworkPanel
-                    settingsPanel
-                    advancedPanel
-                    Text("Music Presence • Local artwork stays yours until uploaded to a public image host.")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.38))
-                        .multilineTextAlignment(.center)
-                        .padding(.bottom, 18)
+                    playerCard
+                    discordCard
+                    artworkCard
+                    settingsCard
+                    footer
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 14)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
             }
+            .scrollIndicators(.hidden)
             .background(Color(red: 0.055, green: 0.055, blue: 0.09).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .preferredColorScheme(.dark)
@@ -38,124 +35,112 @@ struct ContentView: View {
     }
 
     private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 5) {
+        HStack(spacing: 10) {
+            Image(systemName: "waveform")
+                .font(.headline)
+                .foregroundStyle(accent)
+                .frame(width: 34, height: 34)
+                .background(accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 2) {
                 Text("MUSIC PRESENCE")
-                    .font(.caption.weight(.bold))
-                    .tracking(3)
+                    .font(.caption2.weight(.heavy))
+                    .tracking(1.6)
                     .foregroundStyle(accent)
-                Text("Your music. On Discord.")
-                    .font(.title2.weight(.bold))
+                Text("Apple Music × Discord")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
             }
-            Spacer()
-            Image(systemName: "waveform")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(accent)
-                .frame(width: 50, height: 50)
-                .background(panel, in: RoundedRectangle(cornerRadius: 16))
+            Spacer(minLength: 4)
+            Circle()
+                .fill(model.isDiscordReady ? .green : .orange)
+                .frame(width: 8, height: 8)
+            Text(model.isDiscordReady ? "LIVE" : "OFFLINE")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.white.opacity(0.75))
         }
+        .padding(.vertical, 6)
     }
 
-    private var connectionStrip: some View {
-        HStack(spacing: 12) {
-            Label(model.musicStatus, systemImage: "music.note")
-                .lineLimit(1)
-            Spacer()
-            Label(model.isDiscordReady ? "Discord Live" : "Discord Offline",
-                  systemImage: model.isDiscordReady ? "checkmark.circle.fill" : "circle.dashed")
-                .foregroundStyle(model.isDiscordReady ? .green : .orange)
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(.white.opacity(0.8))
-        .padding(14)
-        .background(panel, in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private var nowPlaying: some View {
-        VStack(spacing: 16) {
+    private var playerCard: some View {
+        HStack(alignment: .center, spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: 14)
                     .fill(accent.opacity(0.12))
                 if let image = model.embeddedArtwork {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .padding(12)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     Image(systemName: "music.note")
-                        .font(.system(size: 65))
+                        .font(.title)
                         .foregroundStyle(accent)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .aspectRatio(1, contentMode: .fit)
+            .frame(width: 112, height: 112)
+            .clipped()
 
-            VStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 7) {
+                Text("NOW PLAYING")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.3)
+                    .foregroundStyle(accent)
                 Text(model.trackTitle)
-                    .font(.title2.weight(.bold))
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.white)
                     .lineLimit(2)
-                    .multilineTextAlignment(.center)
+                    .truncationMode(.tail)
                 Text(model.artist)
                     .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.65))
-                    .lineLimit(2)
+                    .foregroundStyle(.white.opacity(0.62))
+                    .lineLimit(1)
                 Text(model.musicStatus)
-                    .font(.caption)
-                    .foregroundStyle(accent)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .lineLimit(1)
             }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(18)
-        .background(panel, in: RoundedRectangle(cornerRadius: 28))
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(panel, in: RoundedRectangle(cornerRadius: 20))
     }
 
-    private var discordPanel: some View {
-        VStack(alignment: .leading, spacing: 16) {
+    private var discordCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("Discord Presence", systemImage: "dot.radiowaves.left.and.right")
-                    .font(.headline)
+                    .font(.subheadline.weight(.bold))
                 Spacer()
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(model.isDiscordReady ? .green : .orange)
-                        .frame(width: 8, height: 8)
-                    Text(model.isDiscordReady ? "Connected" : "Offline")
-                        .font(.caption.weight(.semibold))
-                }
-                .foregroundStyle(.white.opacity(0.75))
+                Text(model.isDiscordReady ? "Connected" : "Disconnected")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(model.isDiscordReady ? .green : .orange)
             }
             Text(model.discordStatus)
-                .font(.footnote)
-                .foregroundStyle(.white.opacity(0.6))
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.62))
+                .lineLimit(2)
+                .frame(height: 32, alignment: .topLeading)
             Button {
-                if model.isDiscordReady {
-                    model.forceRefresh()
-                } else {
-                    model.connectDiscord()
-                }
+                if model.isDiscordReady { model.forceRefresh() }
+                else { model.connectDiscord() }
             } label: {
-                Label(model.isDiscordReady ? "Refresh Discord Presence" : "Connect to Discord",
+                Label(model.isDiscordReady ? "Refresh Presence" : "Connect Discord",
                       systemImage: model.isDiscordReady ? "arrow.clockwise" : "link")
+                    .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 5)
             }
             .buttonStyle(.borderedProminent)
             .tint(accent)
         }
-        .padding(20)
-        .background(panel, in: RoundedRectangle(cornerRadius: 24))
+        .cardStyle(panel)
     }
 
-    private var artworkPanel: some View {
-        VStack(alignment: .leading, spacing: 15) {
+    private var artworkCard: some View {
+        VStack(alignment: .leading, spacing: 11) {
             Label("Artwork Delivery", systemImage: "photo.stack")
-                .font(.headline)
-            Text("Choose which free, no-account host sends your embedded covers to Discord.")
-                .font(.footnote)
-                .foregroundStyle(.white.opacity(0.6))
+                .font(.subheadline.weight(.bold))
             Picker("Image host", selection: Binding(
                 get: { model.artworkProvider },
                 set: { model.selectArtworkProvider($0) }
@@ -165,92 +150,120 @@ struct ContentView: View {
                 Text("Cloud").tag("Cloud")
             }
             .pickerStyle(.segmented)
+
             if model.artworkProvider == "Cloud" {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Private artwork service")
-                        .font(.caption.weight(.semibold))
+                VStack(alignment: .leading, spacing: 9) {
                     TextField("https://your-worker.workers.dev/upload", text: $cloudURLDraft)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
+                        .font(.footnote)
                         .textFieldStyle(.roundedBorder)
-                    SecureField("Upload token", text: $cloudTokenDraft)
+                    SecureField("Worker upload token", text: $cloudTokenDraft)
+                        .font(.footnote)
                         .textFieldStyle(.roundedBorder)
-                    Button("Save cloud configuration") {
+                    Button("Save cloud settings") {
                         model.saveCloudToken(cloudTokenDraft)
                         model.saveCloudEndpoint(cloudURLDraft)
                     }
+                    .font(.footnote.weight(.semibold))
                     .buttonStyle(.bordered)
-                    Text("Cloud hosting must be deployed separately. No server is included in the IPA.")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
+                    .tint(accent)
                 }
                 .onAppear {
                     cloudURLDraft = model.cloudEndpoint
                     cloudTokenDraft = model.cloudToken
                 }
             }
-            Text(model.artworkUploadStatus)
-                .font(.footnote)
-                .foregroundStyle(.white.opacity(0.75))
-                .textSelection(.enabled)
+
+            HStack(alignment: .top, spacing: 7) {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(accent)
+                Text(model.artworkUploadStatus)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .font(.caption)
+            .frame(height: 34, alignment: .topLeading)
+            .animation(nil, value: model.artworkUploadStatus)
+
             if let link = model.artworkPublicURL, let url = URL(string: link) {
                 Link(destination: url) {
-                    Label("View uploaded cover", systemImage: "arrow.up.right.square")
-                        .font(.subheadline.weight(.medium))
+                    Label("Open uploaded artwork", systemImage: "arrow.up.right.square")
+                        .font(.caption.weight(.semibold))
                 }
                 .tint(accent)
-                Text(link)
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.45))
-                    .lineLimit(2)
-                    .textSelection(.enabled)
             }
-            Text("Catbox retains your existing working cover URLs. PixelHost uses a separate cache.")
-                .font(.caption2)
-                .foregroundStyle(.white.opacity(0.45))
         }
-        .padding(20)
-        .background(panel, in: RoundedRectangle(cornerRadius: 24))
+        .cardStyle(panel)
     }
 
-    private var advancedPanel: some View {
+    private var settingsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: $model.autoUpdate) {
+                Label("Automatic Discord updates", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .tint(accent)
+
             Button {
-                withAnimation { showAdvanced.toggle() }
+                showAdvanced.toggle()
             } label: {
                 HStack {
-                    Label("Diagnostics & Details", systemImage: "stethoscope")
+                    Label("Connection diagnostics", systemImage: "stethoscope")
                     Spacer()
                     Image(systemName: showAdvanced ? "chevron.up" : "chevron.down")
                 }
-                .font(.headline)
-                .foregroundStyle(.white)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.85))
             }
+
             if showAdvanced {
-                LabeledContent("Artwork host", value: model.artworkProvider)
-                LabeledContent("Connection", value: model.discordStatus)
-                LabeledContent("Music", value: model.musicStatus)
-                Text("A verified image URL does not guarantee Discord will render it.")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.55))
+                Divider().overlay(.white.opacity(0.1))
+                diagnostic("Discord", model.discordStatus)
+                diagnostic("Music", model.musicStatus)
+                diagnostic("Artwork host", model.artworkProvider)
+                Text("Discord may reject an otherwise valid image URL.")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.5))
             }
         }
-        .padding(20)
-        .background(panel, in: RoundedRectangle(cornerRadius: 24))
+        .cardStyle(panel)
     }
 
-    private var settingsPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Playback Settings", systemImage: "slider.horizontal.3")
-                .font(.headline)
-            Toggle("Automatically update Discord", isOn: $model.autoUpdate)
-                .tint(accent)
-            Text("Track changes are detected automatically while the app can access Apple Music playback.")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.5))
+    private func diagnostic(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.caption2.weight(.bold)).foregroundStyle(accent)
+            Text(value).font(.caption).foregroundStyle(.white.opacity(0.7))
+                .lineLimit(3)
         }
-        .padding(20)
-        .background(panel, in: RoundedRectangle(cornerRadius: 24))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var footer: some View {
+        Text("Embedded artwork is uploaded only to the selected image host. Cloud requires a separately deployed server.")
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.4))
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 8)
+    }
+}
+
+private struct CompactCardStyle: ViewModifier {
+    let color: Color
+    func body(content: Content) -> some View {
+        content
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(color, in: RoundedRectangle(cornerRadius: 20))
+    }
+}
+
+private extension View {
+    func cardStyle(_ color: Color) -> some View {
+        modifier(CompactCardStyle(color: color))
     }
 }
