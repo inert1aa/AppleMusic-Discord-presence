@@ -141,6 +141,34 @@ final class PresenceViewModel: ObservableObject {
     private var uploadedCoverByHash: [String: String] =
         UserDefaults.standard.dictionary(forKey: "uploadedEmbeddedCoverURLs") as? [String: String] ?? [:]
 
+    private var artworkUploadsInProgress = Set<String>()
+
+    private func cachedEmbeddedCoverURL(for item: MPMediaItem) -> String? {
+        guard let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
+              let data = image.jpegData(compressionQuality: 0.9) else { return nil }
+        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return uploadedCoverByHash[hash]
+    }
+
+    private func scheduleEmbeddedCoverUpload(for item: MPMediaItem, identity: String) {
+        guard let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
+              let data = image.jpegData(compressionQuality: 0.9) else { return }
+        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        guard uploadedCoverByHash[hash] == nil,
+              !artworkUploadsInProgress.contains(hash) else { return }
+        artworkUploadsInProgress.insert(hash)
+        Task { [weak self] in
+            guard let self else { return }
+            let url = await self.uploadEmbeddedCover(for: item)
+            self.artworkUploadsInProgress.remove(hash)
+            if url != nil,
+               let current = self.player.nowPlayingItem,
+               self.trackIdentity(for: current) == identity {
+                self.forceRefresh()
+            }
+        }
+    }
+
     private func uploadEmbeddedCover(for item: MPMediaItem) async -> String? {
         guard !Task.isCancelled,
               let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
@@ -1409,7 +1437,7 @@ final class PresenceViewModel: ObservableObject {
 
         // Upload the cover actually embedded in the playing song.
         // Do not substitute Apple's online artwork for custom local files.
-        let embeddedCoverURL = await uploadEmbeddedCover(for: item)
+        let embeddedCoverURL = cachedEmbeddedCoverURL(for: item)
         let resolved = ResolvedStoreInformation(
             songURL: fallbackSongURL(item: item),
             artworkURL: embeddedCoverURL
@@ -1594,6 +1622,11 @@ final class PresenceViewModel: ObservableObject {
             .shared()
             .runCallbacks()
 
+
+        // Upload in parallel so a slow image host never hides the music status.
+        if embeddedCoverURL == nil {
+            scheduleEmbeddedCoverUpload(for: latestItem, identity: currentIdentity)
+        }
 
         startShortBackgroundWindow()
     }
